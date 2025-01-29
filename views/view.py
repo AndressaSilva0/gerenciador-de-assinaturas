@@ -23,10 +23,32 @@ class SubscriptionService:
 
     def delete(self, id):
         with Session(self.engine) as session:
-            statement = select(Subscription).where(Subscription.id == id)
-            result = session.exec(statement).one()
-            session.delete(result)
+            # Buscando a assinatura
+            subscription_statement = select(Subscription).where(Subscription.id == id)
+            subscription = session.exec(subscription_statement).one_or_none()
+
+            if subscription is None:
+                print("Assinatura não encontrada!")
+                return
+
+            # Excluindo os pagamentos associados a essa assinatura
+            payments_statement = select(Payments).where(Payments.subscription_id == id)
+            payments = session.exec(payments_statement).all()
+
+            if payments:
+                for payment in payments:
+                    print(f"Excluindo pagamento da assinatura {subscription.empresa}")
+                    session.delete(payment)
+
+            # Excluindo a assinatura
+            session.delete(subscription)
+
+            # Comitando as alterações no banco de dados
             session.commit()
+            print("Assinatura e seus pagamentos foram excluídos com sucesso.")
+
+
+
 
     def _has_pay(self, results):
         for result in results:
@@ -34,17 +56,25 @@ class SubscriptionService:
                 return True
         return False
 
-    def pay(self, subscription: Subscription):
+    def pay(self, subscription: Subscription, payments: Payments):
         with Session(self.engine) as session:
-            statement = select(Payments).join(Subscription).where(Subscription.empresa == subscription.empresa)
+            statement = (
+                select(Payments)
+                .join(Subscription, Subscription.id == Payments.subscription_id)
+                .where(Subscription.empresa == subscription.empresa)
+            )
             results = session.exec(statement).all()
+
             if self._has_pay(results):
                 question = input('Essa conta já foi paga esse mês, deseja pagar novamente? Y ou N: ')
                 if not question.upper() == 'Y':
                     return
-            pay = Payments(subscription_id=subscription.id)
-            session.add(pay)
+            
+            # Agora, usa `payments` passado como argumento
+            payments.subscription_id = subscription.id  
+            session.add(payments)
             session.commit()
+
 
     def total_value(self):
         with Session(self.engine) as session:

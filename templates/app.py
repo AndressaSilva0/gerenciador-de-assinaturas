@@ -1,6 +1,6 @@
 import __init__
 from views.view import SubscriptionService
-from models.model import Subscription
+from models.model import Subscription, Payments
 from models.database import engine
 from datetime import datetime
 from decimal import Decimal
@@ -22,16 +22,56 @@ class UI:
 
     def delete_subscription(self):
         subscriptions = self.subscription_service.list_all()
-        #TODO: Quando excluir a assinatura, excluir todos os pagamentos dela. Seria inativar assinatura
-        print('Escolha qual assinatura deseja excluir')
 
-        for i in subscriptions:
-            print(f'[{i.id}] -> {i.empresa}')
+        if not subscriptions:
+            print("Não há assinaturas cadastradas.")
+            return
 
-        choice = int(input('Escolha a assinatura: '))
-        self.subscription_service.delete(choice)
-        print('Assinatura excluída com sucesso.')
+            print('Escolha qual assinatura deseja excluir:')
 
+        for sub in subscriptions:
+            print(f'[{sub.id}] -> {sub.empresa}')
+
+        try:
+            choice = int(input('Digite o ID da assinatura: '))
+            # Chamando o método delete que vai excluir a assinatura e os pagamentos associados
+            self.subscription_service.delete(choice)
+            print('Assinatura e pagamentos excluídos com sucesso.')
+            except ValueError:
+            print("ID inválido! Digite um número válido.")
+
+    
+    def pay(self):
+        all_subscriptions = self.subscription_service.list_all()
+        
+        if not all_subscriptions:
+            print("Não há assinaturas cadastradas.")
+            return
+
+        print("Assinaturas disponíveis:")
+        for sub in all_subscriptions:
+            print(f'ID: {sub.id}, Empresa: {sub.empresa}, Valor: {sub.valor:.2f}')
+
+        subscription_id = int(input('Digite o ID da assinatura: '))
+        
+        subscription = next((sub for sub in all_subscriptions if sub.id == subscription_id), None)
+        
+        if subscription is None:
+            print("Assinatura não encontrada!")
+            return
+
+        
+        print(f'Assinatura: {subscription.empresa}')
+        print(f'Valor: {subscription.valor:.2f}')
+
+        # Solicita o valor do pagamento atual
+        payment_value = float(input('Valor do pagamento: '))
+        
+        # Cria o registro de pagamento atual
+        payments = Payments(subscription_id=subscription_id, date=datetime.now(), value=payment_value)
+        
+        # Processa o pagamento atual
+        self.subscription_service.pay(subscription, payments)
     def total_value(self):
         print(f'Seu valor total mensal em assinaturas: {self.subscription_service.total_value()}')
 
@@ -42,7 +82,8 @@ class UI:
             [2] -> Remover assinatura
             [3] -> Valor total
             [4] -> Gastos últimos 12 meses
-            [5] -> Sair
+            [5] -> Pagamento da assinatura
+            [6] -> Sair
             ''')
 
             choice = int(input('Escolha uma opção: '))
@@ -55,6 +96,8 @@ class UI:
                 self.total_value()
             elif choice == 4:
                 self.subscription_service.gen_chart()
+            elif choice == 5:
+               self.pay()
                 #TODO: Chamar o método pay na interface
             else:
                 break
